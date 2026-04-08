@@ -1,21 +1,20 @@
 const router = require('express').Router();
 
+const BLOB_BASE = process.env.EMBR_BLOB_URL || '/_embr/blob';
 const BLOB_KEY = process.env.EMBR_BLOB_KEY || '';
 
-function getBlobBase(req) {
-  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers['host'];
-  return proto + '://' + host + '/_embr/blob';
+function blobUrl(path) {
+  const base = BLOB_BASE.replace(/\/$/, '');
+  return base + '/' + path;
 }
 
 // List files from blob storage
 router.get('/', async (req, res, next) => {
   try {
-    const blobBase = getBlobBase(req);
     const prefix = req.query.prefix || '';
     const pageSize = req.query.pageSize || 100;
     const continuationToken = req.query.continuationToken || '';
-    let url = blobBase + '/?pageSize=' + pageSize;
+    let url = blobUrl('') + '?pageSize=' + pageSize;
     if (prefix) url += '&prefix=' + encodeURIComponent(prefix);
     if (continuationToken) url += '&continuationToken=' + encodeURIComponent(continuationToken);
 
@@ -45,8 +44,7 @@ router.post('/', async (req, res, next) => {
     const blobKey = folder + Date.now() + '-' + fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const fileBuffer = Buffer.from(fileBase64, 'base64');
 
-    const blobBase = getBlobBase(req);
-    const response = await fetch(blobBase + '/' + blobKey, {
+    const response = await fetch(blobUrl(blobKey), {
       method: 'PUT',
       headers: {
         'Content-Type': contentType || 'application/octet-stream',
@@ -72,8 +70,7 @@ router.post('/', async (req, res, next) => {
 // Delete a file
 router.delete('/:key(*)', async (req, res, next) => {
   try {
-    const blobBase = getBlobBase(req);
-    const response = await fetch(blobBase + '/' + req.params.key, {
+    const response = await fetch(blobUrl(req.params.key), {
       method: 'DELETE',
       headers: BLOB_KEY ? { 'Authorization': 'Bearer ' + BLOB_KEY } : {},
     });
